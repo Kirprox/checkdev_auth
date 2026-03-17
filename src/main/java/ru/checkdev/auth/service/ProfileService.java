@@ -26,6 +26,7 @@ import java.util.Optional;
 public class ProfileService {
     private final PersonRepository personRepository;
     private final PasswordEncoder encoding;
+    private final CircuitBreaker circuitBreaker = new CircuitBreaker(5);
 
     /**
      * Получить ProfileDTO по ID
@@ -34,7 +35,9 @@ public class ProfileService {
      * @return ProfileDTO
      */
     public Optional<ProfileDTO> findProfileByID(int id) {
-        return Optional.ofNullable(personRepository.findProfileById(id));
+        return circuitBreaker.exec(
+                () -> Optional.ofNullable(personRepository.findProfileById(id)), null
+        );
     }
 
     /**
@@ -44,12 +47,17 @@ public class ProfileService {
      * @return ProfileDTO
      */
     public Optional<ProfileTgDTO> findProfileTgByID(int id) {
-        return Optional.ofNullable(personRepository.findProfileTgById(id));
+        return circuitBreaker.exec(
+                () -> Optional.ofNullable(personRepository.findProfileTgById(id)),
+                Optional.empty()
+        );
     }
 
     public Optional<ProfileTgDTO> findProfileTgByEmailAndPassword(String email, String password) {
         Optional<ProfileTgDTO> result = Optional.empty();
-        Profile profile = personRepository.findByEmail(email);
+        Profile profile = circuitBreaker.exec(
+                () -> personRepository.findByEmail(email), null
+        );
         if (profile != null && encoding.matches(password, profile.getPassword())) {
             result = Optional.of(new ProfileTgDTO(
                     profile.getId(),
@@ -65,7 +73,8 @@ public class ProfileService {
      * @return List<PersonDTO>
      */
     public List<ProfileDTO> findProfilesOrderByCreatedDesc() {
-        return personRepository.findProfileOrderByCreatedDesc();
+        return circuitBreaker.exec(
+                () -> personRepository.findProfileOrderByCreatedDesc(), null
+        );
     }
-
 }
